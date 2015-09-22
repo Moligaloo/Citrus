@@ -1,0 +1,13 @@
+-- generate create table
+
+-- create table users(id integer primary key autoincrement, name text not null, gender integer not null, location text)
++@users(id: integer!++, name:text, gender:integer, location: text?)
+
+-- insert into users(name, gender) values("Moligaloo", "male")
++users(name: "Moligaloo", gender: "male")
+
+-- select name from users where gender = "male"
+name@users[gender="male"]
+
+-- create view as select name from users where gender = "male"
+@male_names = name@users[gender="male"] 
