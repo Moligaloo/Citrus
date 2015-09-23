@@ -69,7 +69,7 @@ end
 local grammar_string = [[
 	statements <- {| statement+ |}
 	
-	statement <- comment / empty / create_table / insert / select / drop_table
+	statement <- comment / empty / create_table / insert / select / drop_table / delete
 	empty <- { [%nl] } 
 	comment <- { '--' [^%nl]+ %nl }
 	
@@ -98,6 +98,8 @@ local grammar_string = [[
 	id_expr <- {| {:type:''->'id':} '#' {:value:value:} |}
 
 	drop_table <- ({< '-@' {:optional:'?'?:} {:table_name:identifier:} >} %nl) -> drop_table
+
+	delete <- ({< '-' {:table_name:identifier:} {:where_clause:where_clause:} >} %nl ) -> delete
 ]]
 
 grammar_string = grammar_string:
@@ -115,6 +117,21 @@ local function wrap_defs(defs)
 		end
 	end
 	return defs
+end
+
+local function where_clause_to_string(where_clause)
+	if where_clause == '' then
+		return ''
+	end
+	local words = { ' where'}
+	for _, expression in ipairs(where_clause) do
+		if expression.type == 'equation' then
+			table.insert(words, ("%s = %s"):format(expression.left, expression.right))
+		elseif expression.type == 'id' then
+			table.insert(words, 'id = ' .. expression.value)
+		end
+	end
+	return table.concat(words, ' ')
 end
 
 local grammar = re.compile(grammar_string, wrap_defs {
@@ -140,23 +157,10 @@ local grammar = re.compile(grammar_string, wrap_defs {
 		))
 	end,
 	select = function(statement)
-		local where_clause = ''
-		if statement.where_clause ~= '' then
-			local words = { ' where'}
-			for _, expression in ipairs(statement.where_clause) do
-				if expression.type == 'equation' then
-					table.insert(words, ("%s = %s"):format(expression.left, expression.right))
-				elseif expression.type == 'id' then
-					table.insert(words, 'id = ' .. expression.value)
-				end
-			end
-			where_clause = table.concat(words, ' ')
-		end
-
 		return ("select %s from %s%s;\n"):format(
 			table.concat(statement.fields, ','),
 			statement.table_name,
-			where_clause
+			where_clause_to_string(statement.where_clause)
 		)
 	end,
 	drop_table = function(statement)
@@ -165,6 +169,9 @@ local grammar = re.compile(grammar_string, wrap_defs {
 		else
 			return ("drop table %s;\n"):format(statement.table_name)
 		end
+	end,
+	delete = function(statement)
+		return ('delete from %s%s;\n'):format(statement.table_name, where_clause_to_string(statement.where_clause))
 	end
 })
 
