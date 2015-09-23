@@ -9,3 +9,5 @@ gender@users#123
 -users[location = "Shanghai"]
 
 -@users
+
+location="Shanghai"@users#123

@@ -69,7 +69,7 @@ end
 local grammar_string = [[
 	statements <- {| statement+ |}
 	
-	statement <- comment / empty / create_table / insert / select / drop_table / delete
+	statement <- comment / empty / create_table / insert / select / drop_table / delete / update
 	empty <- { [%nl] } 
 	comment <- { '--' [^%nl]+ %nl }
 	
@@ -84,7 +84,7 @@ local grammar_string = [[
 	
 	insert <- {< '+' {:table_name:identifier:} {:key_values:key_values:} >} -> insert
 	key_values <- '(' s {| key_value+ |} s ')'
-	key_value <- {| {:key:identifier:} s ':' s {:value:value:} |} / (',' s key_value)
+	key_value <- {| {:key:identifier:} s ':' s {:value:value:} |} (s ',' s)?
 	value <- integer_literal / string_literal / identifier
 	integer_literal <- [0-9]+
 	string_literal <- '"' [^"]+ '"'
@@ -100,6 +100,10 @@ local grammar_string = [[
 	drop_table <- ({< '-@' {:optional:'?'?:} {:table_name:identifier:} >} %nl) -> drop_table
 
 	delete <- ({< '-' {:table_name:identifier:} {:where_clause:where_clause:} >} %nl ) -> delete
+
+	update <- ({< {:update_pairs:update_pairs:} s '@' s {:table_name:identifier:} {:where_clause:where_clause:} >} %nl ) -> update
+	update_pairs <- {| update_pair+ |}
+	update_pair <- {| {:field_name:identifier:} s '=' s {:value:value:}  (s ',' s)? |}
 ]]
 
 grammar_string = grammar_string:
@@ -132,6 +136,14 @@ local function where_clause_to_string(where_clause)
 		end
 	end
 	return table.concat(words, ' ')
+end
+
+local function update_pairs_to_string(update_pairs)
+	local words = {}
+	for _, pair in pairs(update_pairs) do
+		table.insert(words, ("%s = %s"):format(pair.field_name, pair.value))
+	end
+	return table.concat(words, ', ')
 end
 
 local grammar = re.compile(grammar_string, wrap_defs {
@@ -172,6 +184,13 @@ local grammar = re.compile(grammar_string, wrap_defs {
 	end,
 	delete = function(statement)
 		return ('delete from %s%s;\n'):format(statement.table_name, where_clause_to_string(statement.where_clause))
+	end,
+	update = function(statement)
+		return ('update %s set %s%s;\n'):format(
+			statement.table_name, 
+			update_pairs_to_string(statement.update_pairs),
+			where_clause_to_string(statement.where_clause)
+		)
 	end
 })
 
