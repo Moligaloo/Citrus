@@ -2,9 +2,14 @@
 
 local citrus = require 'citrus'
 
-local file = io.open('sample.citrus')
-local content = file:read '*a'
-file:close()
+if #arg >= 1 then
+	io.input(arg[1])
+	if #arg >= 2 then
+		io.output(arg[2])
+	end
+end
+
+local content = io.input():read '*a'
 
 local sql = citrus.to_sqlite(content)
 if sql == nil then
@@ -12,6 +17,4 @@ if sql == nil then
 	return
 end
 
-file = io.open('sample.sql', 'w')
-file:write(sql)
-file:close()
+io.write(sql)
