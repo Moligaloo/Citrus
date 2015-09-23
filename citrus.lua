@@ -69,7 +69,7 @@ end
 local grammar_string = [[
 	statements <- {| statement+ |}
 	
-	statement <- comment / empty / create_table / insert
+	statement <- comment / empty / create_table / insert / select
 	empty <- { [%nl] } 
 	comment <- { '--' [^%nl]+ %nl }
 	
@@ -85,12 +85,25 @@ local grammar_string = [[
 	insert <- {< '+' {:table_name:identifier:} {:key_values:key_values:} >} -> insert
 	key_values <- '(' s {| key_value+ |} s ')'
 	key_value <- {| {:key:identifier:} s ':' s {:value:value:} |} / (',' s key_value)
-	value <- integer_literal / string_literal
+	value <- integer_literal / string_literal / identifier
 	integer_literal <- [0-9]+
 	string_literal <- '"' [^"]+ '"'
+
+	select <- ({< {:fields:fields:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} >} %nl)-> select
+	fields <- LIST(field,',')
+	field <- identifier
+	where_clause <- ('[' s {| where_expr |} s ']') / {| id_expr |}
+	where_expr <- equation_expr
+	equation_expr <- {| {:type:''->'equation':} {:left:value:} s '=' s {:right:value:} |}
+	id_expr <- {| {:type:''->'id':} '#' {:value:value:} |}
 ]]
 
-grammar_string = grammar_string:gsub('{<', '{| {:start:{}:} '):gsub('>}', '{:finish:{}:} |}')
+grammar_string = grammar_string:
+	gsub('{<', '{| {:start:{}:} '):
+	gsub('>}', '{:finish:{}:} |}'):
+	gsub('LIST%(([%w]+)%s*,%s*([^%)]+)%)', function(elem, sep)
+		return ('{| {%s} (s %s s {%s})* |}'):format(elem, sep, elem)
+	end)
 
 local grammar = re.compile(grammar_string, {
 	create_table = function(statement)
@@ -115,6 +128,28 @@ local grammar = re.compile(grammar_string, {
 			table.concat(keys, ', '),
 			table.concat(values, ', ')
 		))
+
+		return statement
+	end,
+	select = function(statement)
+		local where_clause = ''
+		if statement.where_clause ~= '' then
+			local words = { ' where'}
+			for _, expression in ipairs(statement.where_clause) do
+				if expression.type == 'equation' then
+					table.insert(words, ("%s = %s"):format(expression.left, expression.right))
+				elseif expression.type == 'id' then
+					table.insert(words, 'id = ' .. expression.value)
+				end
+			end
+			where_clause = table.concat(words, ' ')
+		end
+
+		statement.value = ("select %s from %s%s;\n"):format(
+			table.concat(statement.fields, ','),
+			statement.table_name,
+			where_clause
+		)
 
 		return statement
 	end
