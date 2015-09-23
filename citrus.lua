@@ -69,7 +69,7 @@ end
 local grammar_string = [[
 	statements <- {| statement+ |}
 	
-	statement <- comment / empty / create_table / insert / select
+	statement <- comment / empty / create_table / insert / select / drop_table
 	empty <- { [%nl] } 
 	comment <- { '--' [^%nl]+ %nl }
 	
@@ -96,6 +96,8 @@ local grammar_string = [[
 	where_expr <- equation_expr
 	equation_expr <- {| {:type:''->'equation':} {:left:value:} s '=' s {:right:value:} |}
 	id_expr <- {| {:type:''->'id':} '#' {:value:value:} |}
+
+	drop_table <- ({< '-@' {:optional:'?'?:} {:table_name:identifier:} >} %nl) -> drop_table
 ]]
 
 grammar_string = grammar_string:
@@ -105,16 +107,24 @@ grammar_string = grammar_string:
 		return ('{| {%s} (s %s s {%s})* |}'):format(elem, sep, elem)
 	end)
 
-local grammar = re.compile(grammar_string, {
+local function wrap_defs(defs)
+	for name, func in pairs(defs) do
+		defs[name] = function(statement)
+			statement.value = func(statement)
+			return statement
+		end
+	end
+	return defs
+end
+
+local grammar = re.compile(grammar_string, wrap_defs {
 	create_table = function(statement)
-		statement.value = 
+		return
 			("create table %s%s(%s);\n"):format(
 				statement.table_name,
 				statement.optional == '?' and ' if not exists' or '',
 				column_defs_from_columns(statement.columns)
 			)
-
-		return statement
 	end,
 	insert = function(statement)
 		local keys, values = {}, {}
@@ -123,13 +133,11 @@ local grammar = re.compile(grammar_string, {
 			table.insert(values, pair.value)
 		end
 
-		statement.value = (("insert into %s(%s) values(%s);"):format(
+		return (("insert into %s(%s) values(%s);"):format(
 			statement.table_name,
 			table.concat(keys, ', '),
 			table.concat(values, ', ')
 		))
-
-		return statement
 	end,
 	select = function(statement)
 		local where_clause = ''
@@ -145,13 +153,18 @@ local grammar = re.compile(grammar_string, {
 			where_clause = table.concat(words, ' ')
 		end
 
-		statement.value = ("select %s from %s%s;\n"):format(
+		return ("select %s from %s%s;\n"):format(
 			table.concat(statement.fields, ','),
 			statement.table_name,
 			where_clause
 		)
-
-		return statement
+	end,
+	drop_table = function(statement)
+		if statement.optional == '?' then
+			return ("drop table if exists %s;\n"):format(statement.table_name)
+		else
+			return ("drop table %s;\n"):format(statement.table_name)
+		end
 	end
 })
 
