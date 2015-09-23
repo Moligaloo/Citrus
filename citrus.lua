@@ -66,14 +66,18 @@ local function column_defs_from_columns(columns)
 	)
 end
 
+local function expand(format, vars)
+	return format:gsub('$([%w_]+)', vars)
+end
+
 local grammar_string = [[
 	statements <- {| statement+ |}
 	
-	statement <- comment / empty / create_table / insert / select / drop_table / delete / update
+	statement <- comment / empty / create_table / insert / select / select_all / drop_table / delete / update
 	empty <- { [%nl] } 
 	comment <- { '--' [^%nl]+ %nl }
 	
-	create_table <- ({< '+@' {:optional:'?'?:} s {:table_name:identifier:}  {:columns:column_defs:}  >} %nl) -> create_table
+	create_table <- ({< '+@' {:optional:'?'?:} s {:table_name:identifier:}  {:columns:column_defs:}  >} &%nl) -> create_table
 	identifier <- [_a-zA-Z][_a-zA-Z0-9]+
 	column_defs <- '(' s {| column_def+ |} s ')'
 	column_def <- {| {:column_name:identifier:} s ':' s {:column_type:column_type:} |} / (',' s column_def)
@@ -82,14 +86,14 @@ local grammar_string = [[
 	column_type_postfixes <- {| {column_type_postfix}* |} 
 	s <- [%s]*
 	
-	insert <- {< '+' {:table_name:identifier:} {:key_values:key_values:} >} -> insert
+	insert <- {< '+' {:table_name:identifier:} {:key_values:key_values:} &%nl >} -> insert
 	key_values <- '(' s {| key_value+ |} s ')'
 	key_value <- {| {:key:identifier:} s ':' s {:value:value:} |} (s ',' s)?
 	value <- integer_literal / string_literal / identifier
 	integer_literal <- [0-9]+
 	string_literal <- '"' [^"]+ '"'
 
-	select <- ({< {:fields:fields:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} >} %nl)-> select
+	select <- {< {:fields:fields:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} &%nl >}-> select
 	fields <- LIST(field,',')
 	field <- identifier
 	where_clause <- ('[' s {| where_expr |} s ']') / {| id_expr |}
@@ -97,9 +101,11 @@ local grammar_string = [[
 	equation_expr <- {| {:type:''->'equation':} {:left:value:} s '=' s {:right:value:} |}
 	id_expr <- {| {:type:''->'id':} '#' {:value:value:} |}
 
-	drop_table <- ({< '-@' {:optional:'?'?:} {:table_name:identifier:} >} %nl) -> drop_table
+	select_all <- ( {< {:table_name:identifier:} >} & %nl) -> select_all
 
-	delete <- ({< '-' {:table_name:identifier:} {:where_clause:where_clause:} >} %nl ) -> delete
+	drop_table <- ({< '-@' {:optional:'?'?:} {:table_name:identifier:} >} &%nl) -> drop_table
+
+	delete <- {< '-' {:table_name:identifier:} {:where_clause:where_clause:} &%nl >}  -> delete
 
 	update <- ({< {:update_pairs:update_pairs:} s '@' s {:table_name:identifier:} {:where_clause:where_clause:} >} %nl ) -> update
 	update_pairs <- {| update_pair+ |}
@@ -149,7 +155,7 @@ end
 local grammar = re.compile(grammar_string, wrap_defs {
 	create_table = function(statement)
 		return
-			("create table %s%s(\n\t%s\n);\n"):format(
+			("create table %s%s(\n\t%s\n);"):format(
 				statement.table_name,
 				statement.optional == '?' and ' if not exists' or '',
 				column_defs_from_columns(statement.columns)
@@ -169,21 +175,24 @@ local grammar = re.compile(grammar_string, wrap_defs {
 		))
 	end,
 	select = function(statement)
-		return ("select %s from %s%s;\n"):format(
+		return ("select %s from %s%s;"):format(
 			table.concat(statement.fields, ','),
 			statement.table_name,
 			where_clause_to_string(statement.where_clause)
 		)
 	end,
+	select_all = function(statement)
+		return expand('select * from $table_name', statement)
+	end,
 	drop_table = function(statement)
 		if statement.optional == '?' then
-			return ("drop table if exists %s;\n"):format(statement.table_name)
+			return expand("drop table if exists $table_name;", statement)
 		else
-			return ("drop table %s;\n"):format(statement.table_name)
+			return expand("drop table $table_name;", statement)
 		end
 	end,
 	delete = function(statement)
-		return ('delete from %s%s;\n'):format(statement.table_name, where_clause_to_string(statement.where_clause))
+		return ('delete from %s%s;'):format(statement.table_name, where_clause_to_string(statement.where_clause))
 	end,
 	update = function(statement)
 		return ('update %s set %s%s;\n'):format(
