@@ -182,7 +182,7 @@ local grammar = re.compile(grammar_string, wrap_defs {
 		)
 	end,
 	select_all = function(statement)
-		return expand('select * from $table_name', statement)
+		return expand('select * from $table_name;', statement)
 	end,
 	drop_table = function(statement)
 		if statement.optional == '?' then
