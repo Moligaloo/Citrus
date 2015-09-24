@@ -17,7 +17,7 @@ Citrus is a new query language that can be compiled to SQL to execute query on r
 
 Converted SQL
 ```sql
-create table users if not exists(
+create table if not exists users(
 	id integer primary key autoincrement,
 	name text not null,
 	gender integer not null,

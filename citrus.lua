@@ -156,8 +156,8 @@ local grammar = re.compile(grammar_string, wrap_defs {
 	create_table = function(statement)
 		return
 			("create table %s%s(\n\t%s\n);"):format(
+				statement.optional == '?' and 'if not exists ' or '',
 				statement.table_name,
-				statement.optional == '?' and ' if not exists' or '',
 				column_defs_from_columns(statement.columns)
 			)
 	end,
