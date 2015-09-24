@@ -67,7 +67,8 @@ local function column_defs_from_columns(columns)
 end
 
 local function expand(format, vars)
-	return format:gsub('$([%w_]+)', vars)
+	local string = format:gsub('$([%w_]+)', vars)
+	return string
 end
 
 local grammar_string = [[
@@ -93,13 +94,17 @@ local grammar_string = [[
 	integer_literal <- [0-9]+
 	string_literal <- '"' [^"]+ '"'
 
-	select <- {< {:fields:fields:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} &%nl >}-> select
+	select <- {< {:fields:fields:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} {:order_items:order_items?:} &%nl >}-> select
 	fields <- LIST(field,',')
 	field <- identifier
 	where_clause <- ('[' s {| where_expr |} s ']') / {| id_expr |}
 	where_expr <- equation_expr
 	equation_expr <- {| {:type:''->'equation':} {:left:value:} s '=' s {:right:value:} |}
 	id_expr <- {| {:type:''->'id':} '#' {:value:value:} |}
+	order_items <- {| order_item+ |}
+	order_item <- asc_item / desc_item 
+	asc_item <-  {| {:order:''->'asc':} s '^' s {:field_name:identifier:} |}
+	desc_item <- {| {:order:''->'desc':} s '!' s {:field_name:identifier:} |}
 
 	select_all <- ( {< {:table_name:identifier:} >} & %nl) -> select_all
 
@@ -144,6 +149,20 @@ local function where_clause_to_string(where_clause)
 	return table.concat(words, ' ')
 end
 
+
+local function order_items_to_string(order_items)
+	if #order_items == 0 then
+		return ''
+	end
+
+	local items = {}
+	for _, item in ipairs(order_items) do
+		table.insert(items, expand('$field_name $order', item))
+	end
+
+	return ' order by ' .. table.concat(items, ', ');
+end
+
 local function update_pairs_to_string(update_pairs)
 	local words = {}
 	for _, pair in pairs(update_pairs) do
@@ -175,10 +194,11 @@ local grammar = re.compile(grammar_string, wrap_defs {
 		))
 	end,
 	select = function(statement)
-		return ("select %s from %s%s;"):format(
+		return ("select %s from %s%s%s;"):format(
 			table.concat(statement.fields, ','),
 			statement.table_name,
-			where_clause_to_string(statement.where_clause)
+			where_clause_to_string(statement.where_clause),
+			order_items_to_string(statement.order_items)
 		)
 	end,
 	select_all = function(statement)
