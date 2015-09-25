@@ -114,7 +114,7 @@ local grammar_string = [[
 
 	drop_table <- ({< '-@' {:optional:'?'?:} {:table_name:identifier:} >} &%nl) -> drop_table
 
-	delete <- {< '-' {:table_name:identifier:} {:where_clause:where_clause:} &%nl >}  -> delete
+	delete <- {< '-' {:table_name:identifier:} {:where_clause:where_clause?:} &%nl >}  -> delete
 
 	update <- ({< {:update_pairs:update_pairs:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} >} &%nl ) -> update
 	update_pairs <- {| update_pair+ |}

@@ -50,6 +50,7 @@ function test_update()
 end
 
 function test_delete()
+	ae('-users', 'delete from users')
 	ae('-users[location = "Shanghai"]', 'delete from users where location = "Shanghai"')
 end
 
