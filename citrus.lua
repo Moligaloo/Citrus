@@ -138,11 +138,12 @@ local function wrap_defs(defs)
 	return defs
 end
 
-local function where_clause_to_string(where_clause)
+local function where_clause_to_string(where_clause, options)
+	options = options or { prepend_space = false }
 	if where_clause == '' then
 		return ''
 	end
-	local words = {'where'}
+	local words = { options.prepend_space and ' where' or 'where'}
 	for _, expression in ipairs(where_clause) do
 		if expression.type == 'equation' then
 			table.insert(words, ("%s = %s"):format(expression.left, expression.right))
@@ -248,18 +249,16 @@ local grammar = re.compile(grammar_string, wrap_defs {
 		end
 	end,
 	delete = function(statement)
-		local where_string = where_clause_to_string(statement.where_clause)
-		if where_string == '' then
-			return ('delete from %s;'):format(statement.table_name)
-		else
-			return ('delete from %s %s;'):format(statement.table_name, where_string)
-		end
+		return ('delete from %s%s;'):format(
+			statement.table_name, 
+			where_clause_to_string(statement.where_clause, {prepend_space = true})
+		)
 	end,
 	update = function(statement)
 		return ('update %s set %s%s;\n'):format(
 			statement.table_name, 
 			update_pairs_to_string(statement.update_pairs),
-			where_clause_to_string(statement.where_clause)
+			where_clause_to_string(statement.where_clause, {prepend_space = true})
 		)
 	end
 })

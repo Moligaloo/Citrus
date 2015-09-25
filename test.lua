@@ -44,6 +44,10 @@ function test_select()
 	ae('id,name@users', 'select id, name from users')
 end
 
+function test_update()
+	ae('location="Shanghai"@users[id=123]', 'update users set location = "Shanghai" where id = 123')
+end
+
 function test_delete()
 	ae('-users[location = "Shanghai"]', 'delete from users where location = "Shanghai"')
 end
