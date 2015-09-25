@@ -233,7 +233,7 @@ local grammar = re.compile(grammar_string, wrap_defs {
 	end,
 	select = function(statement)
 		return ("select %s %s;"):format(
-			statement.fields == '*' and '*' or table.concat(statement.fields, ','),
+			statement.fields == '*' and '*' or table.concat(statement.fields, ', '),
 			modifiers_to_string(statement.modifiers)
 		)
 	end,

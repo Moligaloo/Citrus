@@ -43,6 +43,7 @@ function test_select()
 	assertEquals(convert('name@users^10\n'), 'select name from users limit 10;\n')
 	assertEquals(convert('name@users+20\n'), 'select name from users offset 20;\n')
 	assertEquals(convert('name@users+20^10\n'), 'select name from users limit 10 offset 20;\n')
+	assertEquals(convert('id,name@users\n'), 'select id, name from users;\n')
 end
 
 function test_delete()
