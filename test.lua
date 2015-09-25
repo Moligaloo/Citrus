@@ -37,6 +37,8 @@ function test_select()
 	assertEquals(convert('users\n'), 'select * from users;\n')
 	assertEquals(convert('name@users#123\n'), 'select name from users where id = 123;\n')
 	assertEquals(convert('name@users\n'), 'select name from users;\n')
+	assertEquals(convert('name@users>id\n'), 'select name from users order by id desc;\n')
+	assertEquals(convert('name@users>id<name\n'), 'select name from users order by id desc, name asc;\n')
 end
 
 function test_delete()
