@@ -74,7 +74,7 @@ end
 local grammar_string = [[
 	statements <- {| statement+ |}
 	
-	statement <- comment / empty / create_table / insert / select / select_all / drop_table / delete / update
+	statement <- comment / empty / create_table / insert / select_all / select / drop_table / delete / update
 	empty <- { [%nl] } 
 	comment <- { '--' [^%nl]+ %nl }
 	
@@ -94,7 +94,7 @@ local grammar_string = [[
 	integer_literal <- [0-9]+
 	string_literal <- '"' [^"]+ '"'
 
-	select <- {< {:fields:fields:} s '@' s {:table_name:identifier:} {:modifiers:modifiers?:} &%nl >}-> select
+	select <- {< {:fields:fields:} {:modifiers:modifiers?:} &%nl >}-> select
 	fields <- LIST(field,',')
 	field <- identifier
 	where_clause <- ('[' s {| where_expr |} s ']') / {| id_expr |}
@@ -102,10 +102,11 @@ local grammar_string = [[
 	equation_expr <- {| {:type:''->'equation':} {:left:value:} s '=' s {:right:value:} |}
 	id_expr <- {| {:type:''->'id':} '#' {:value:value:} |}
 	modifiers <- {| {modifier}+ |}
-	modifier <- asc_modifier / desc_modifier / where_modifier
+	modifier <- asc_modifier / desc_modifier / where_modifier / from_modifier
 	where_modifier <- {| {:where_clause:where_clause:} |}
 	asc_modifier <-  {| s '<' s {:asc:identifier:} |}
 	desc_modifier <- {| s '>' s {:desc:identifier:} |}
+	from_modifier <- {| s '@' s {:from:identifier:} |}
 
 	select_all <- ( {< {:table_name:identifier:} >} & %nl) -> select_all
 
@@ -139,7 +140,7 @@ local function where_clause_to_string(where_clause)
 	if where_clause == '' then
 		return ''
 	end
-	local words = { ' where'}
+	local words = {'where'}
 	for _, expression in ipairs(where_clause) do
 		if expression.type == 'equation' then
 			table.insert(words, ("%s = %s"):format(expression.left, expression.right))
@@ -156,20 +157,24 @@ local function modifiers_to_string(modifiers)
 	end
 
 	local order_items = {}
-	local where_string
+	local where_string, from_string
 	for _, modifier in ipairs(modifiers) do
 		if modifier.asc then
 			table.insert(order_items, ('%s asc'):format(modifier.asc))
 		elseif modifier.desc then
 			table.insert(order_items, ('%s desc'):format(modifier.desc))
-		end
-
-		if modifier.where_clause then
+		elseif modifier.where_clause then
 			where_string = where_clause_to_string(modifier.where_clause)
+		elseif modifier.from then
+			from_string = 'from ' .. modifier.from
 		end
 	end
 
 	local words = {}
+	if from_string then
+		table.insert(words, from_string)
+	end
+
 	if where_string then
 		table.insert(words, where_string)
 	end
@@ -212,7 +217,7 @@ local grammar = re.compile(grammar_string, wrap_defs {
 		))
 	end,
 	select = function(statement)
-		return ("select %s%s;"):format(
+		return ("select %s %s;"):format(
 			table.concat(statement.fields, ','),
 			modifiers_to_string(statement.modifiers)
 		)
@@ -228,7 +233,12 @@ local grammar = re.compile(grammar_string, wrap_defs {
 		end
 	end,
 	delete = function(statement)
-		return ('delete from %s%s;'):format(statement.table_name, where_clause_to_string(statement.where_clause))
+		local where_string = where_clause_to_string(statement.where_clause)
+		if where_string == '' then
+			return ('delete from %s;'):format(statement.table_name)
+		else
+			return ('delete from %s %s;'):format(statement.table_name, where_string)
+		end
 	end,
 	update = function(statement)
 		return ('update %s set %s%s;\n'):format(
