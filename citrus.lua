@@ -116,7 +116,7 @@ local grammar_string = [[
 
 	delete <- {< '-' {:table_name:identifier:} {:where_clause:where_clause:} &%nl >}  -> delete
 
-	update <- ({< {:update_pairs:update_pairs:} s '@' s {:table_name:identifier:} {:where_clause:where_clause:} >} %nl ) -> update
+	update <- ({< {:update_pairs:update_pairs:} s '@' s {:table_name:identifier:} {:where_clause:where_clause:} >} &%nl ) -> update
 	update_pairs <- {| update_pair+ |}
 	update_pair <- {| {:field_name:identifier:} s '=' s {:value:value:}  (s ',' s)? |}
 ]]
@@ -255,10 +255,13 @@ local grammar = re.compile(grammar_string, wrap_defs {
 		)
 	end,
 	update = function(statement)
-		return ('update %s set %s%s;\n'):format(
-			statement.table_name, 
-			update_pairs_to_string(statement.update_pairs),
-			where_clause_to_string(statement.where_clause, {prepend_space = true})
+		return expand(
+			'update $table_name set $update_pairs$where_clause;',
+			{
+				table_name = statement.table_name,
+				update_pairs = update_pairs_to_string(statement.update_pairs),
+				where_clause = where_clause_to_string(statement.where_clause, {prepend_space = true})
+			}
 		)
 	end
 })
