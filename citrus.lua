@@ -94,17 +94,17 @@ local grammar_string = [[
 	integer_literal <- [0-9]+
 	string_literal <- '"' [^"]+ '"'
 
-	select <- {< {:fields:fields:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} {:order_items:order_items?:} &%nl >}-> select
+	select <- {< {:fields:fields:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} {:modifiers:modifiers?:} &%nl >}-> select
 	fields <- LIST(field,',')
 	field <- identifier
 	where_clause <- ('[' s {| where_expr |} s ']') / {| id_expr |}
 	where_expr <- equation_expr
 	equation_expr <- {| {:type:''->'equation':} {:left:value:} s '=' s {:right:value:} |}
 	id_expr <- {| {:type:''->'id':} '#' {:value:value:} |}
-	order_items <- {| order_item+ |}
-	order_item <- asc_item / desc_item 
-	asc_item <-  {| {:order:''->'asc':} s '^' s {:field_name:identifier:} |}
-	desc_item <- {| {:order:''->'desc':} s '!' s {:field_name:identifier:} |}
+	modifiers <- {| {modifier}+ |}
+	modifier <- asc_item / desc_item
+	asc_item <-  {| s {:prefix:'<':} s {:field_name:identifier:} |}
+	desc_item <- {| s {:prefix:'>':} s {:field_name:identifier:} |}
 
 	select_all <- ( {< {:table_name:identifier:} >} & %nl) -> select_all
 
@@ -149,18 +149,30 @@ local function where_clause_to_string(where_clause)
 	return table.concat(words, ' ')
 end
 
-
-local function order_items_to_string(order_items)
-	if #order_items == 0 then
+local function modifiers_to_string(modifiers)
+	if modifiers == '' then
 		return ''
 	end
 
-	local items = {}
-	for _, item in ipairs(order_items) do
-		table.insert(items, expand('$field_name $order', item))
+	local order_items = {}
+	for _, modifier in ipairs(modifiers) do
+		if modifier.prefix == '<' then
+			table.insert(order_items, ('%s asc'):format(modifier.field_name))
+		elseif modifier.prefix == '>' then
+			table.insert(order_items, ('%s desc'):format(modifier.field_name))
+		end
 	end
 
-	return ' order by ' .. table.concat(items, ', ');
+	local words = {}
+	if next(order_items) then
+		table.insert(words, 'order by ' .. table.concat(order_items, ', '))
+	end
+
+	if words[1] ~= '' then
+		table.insert(words, 1, '')
+	end
+
+	return table.concat(words, ' ')
 end
 
 local function update_pairs_to_string(update_pairs)
@@ -198,7 +210,7 @@ local grammar = re.compile(grammar_string, wrap_defs {
 			table.concat(statement.fields, ','),
 			statement.table_name,
 			where_clause_to_string(statement.where_clause),
-			order_items_to_string(statement.order_items)
+			modifiers_to_string(statement.modifiers)
 		)
 	end,
 	select_all = function(statement)
