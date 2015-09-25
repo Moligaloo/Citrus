@@ -46,6 +46,7 @@ end
 
 function test_update()
 	ae('location="Shanghai"@users[id=123]', 'update users set location = "Shanghai" where id = 123')
+	ae('age=18@users', 'update users set age = 18')
 end
 
 function test_delete()

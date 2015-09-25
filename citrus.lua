@@ -116,7 +116,7 @@ local grammar_string = [[
 
 	delete <- {< '-' {:table_name:identifier:} {:where_clause:where_clause:} &%nl >}  -> delete
 
-	update <- ({< {:update_pairs:update_pairs:} s '@' s {:table_name:identifier:} {:where_clause:where_clause:} >} &%nl ) -> update
+	update <- ({< {:update_pairs:update_pairs:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} >} &%nl ) -> update
 	update_pairs <- {| update_pair+ |}
 	update_pair <- {| {:field_name:identifier:} s '=' s {:value:value:}  (s ',' s)? |}
 ]]
