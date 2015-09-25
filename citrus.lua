@@ -77,8 +77,8 @@ local grammar_string = [[
 	statement <- comment / empty / create_table / insert / select_all / select / drop_table / delete / update
 	empty <- { [%nl] } 
 	comment <- { '--' [^%nl]+ %nl }
-	
-	create_table <- ({< '+@' {:optional:'?'?:} s {:table_name:identifier:}  {:columns:column_defs:}  >} &%nl) -> create_table
+
+	SQL:create_table '+@' {:optional:'?'?:} s {:table_name:identifier:}  {:columns:column_defs:}
 	identifier <- [_a-zA-Z][_a-zA-Z0-9]+
 	column_defs <- '(' s {| column_def+ |} s ')'
 	column_def <- {| {:column_name:identifier:} s ':' s {:column_type:column_type:} |} / (',' s column_def)
@@ -87,14 +87,14 @@ local grammar_string = [[
 	column_type_postfixes <- {| {column_type_postfix}* |} 
 	s <- [%s]*
 	
-	insert <- {< '+' {:table_name:identifier:} {:key_values:key_values:} &%nl >} -> insert
+	SQL:insert '+' {:table_name:identifier:} {:key_values:key_values:} 
 	key_values <- '(' s {| key_value+ |} s ')'
 	key_value <- {| {:key:identifier:} s ':' s {:value:value:} |} (s ',' s)?
 	value <- integer_literal / string_literal / identifier
 	integer_literal <- [0-9]+
 	string_literal <- '"' [^"]+ '"'
 
-	select <- {< ({:fields:fields:} / {:fields:'*':}) {:modifiers:modifiers?:} &%nl >}-> select
+	SQL:select ({:fields:fields:} / {:fields:'*':}) {:modifiers:modifiers?:} 
 	fields <- LIST(field,',')
 	field <- identifier
 	where_clause <- ('[' s {| where_expr |} s ']') / {| id_expr |}
@@ -110,24 +110,23 @@ local grammar_string = [[
 	limit_modifer <- {| s '^' s {:limit:integer_literal:} |}
 	offset_modifier <- {| s '+' s {:offset:integer_literal:} |}
 
-	select_all <- ( {< {:table_name:identifier:} >} & %nl) -> select_all
+	SQL:select_all {:table_name:identifier:} 
 
-	drop_table <- ({< '-@' {:optional:'?'?:} {:table_name:identifier:} >} &%nl) -> drop_table
+	SQL:drop_table '-@' {:optional:'?'?:} {:table_name:identifier:} 
 
-	delete <- {< '-' {:table_name:identifier:} {:where_clause:where_clause?:} &%nl >}  -> delete
+	SQL:delete '-' {:table_name:identifier:} {:where_clause:where_clause?:}
 
-	update <- ({< {:update_pairs:update_pairs:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} >} &%nl ) -> update
+	SQL:update {:update_pairs:update_pairs:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} 
 	update_pairs <- {| update_pair+ |}
 	update_pair <- {| {:field_name:identifier:} s '=' s {:value:value:}  (s ',' s)? |}
 ]]
 
 grammar_string = grammar_string:
-	gsub('{<', '{| {:start:{}:} '):
-	gsub('>}', '{:finish:{}:} |}'):
+	gsub('SQL:([%w_]+)%s+([^\n]+)', '%1 <- ( {| {:start:{}:} %2 {:finish:{}:} |} &%%nl ) -> %1'):
 	gsub('LIST%(([%w]+)%s*,%s*([^%)]+)%)', function(elem, sep)
 		return ('{| {%s} (s %s s {%s})* |}'):format(elem, sep, elem)
 	end)
-
+	
 local function wrap_defs(defs)
 	for name, func in pairs(defs) do
 		defs[name] = function(statement)
@@ -172,8 +171,14 @@ local function modifiers_to_string(modifiers)
 		elseif modifier.from then
 			from_string = 'from ' .. modifier.from
 		elseif modifier.limit then
+			if limit then
+				error 'only one limit allowed'
+			end
 			limit = modifier.limit
 		elseif modifier.offset then
+			if offset then
+				error 'only one offset allowed'
+			end
 			offset = modifier.offset
 		end
 	end
