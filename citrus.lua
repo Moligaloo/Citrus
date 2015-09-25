@@ -94,7 +94,7 @@ local grammar_string = [[
 	integer_literal <- [0-9]+
 	string_literal <- '"' [^"]+ '"'
 
-	select <- {< {:fields:fields:} {:modifiers:modifiers?:} &%nl >}-> select
+	select <- {< ({:fields:fields:} / {:fields:'*':}) {:modifiers:modifiers?:} &%nl >}-> select
 	fields <- LIST(field,',')
 	field <- identifier
 	where_clause <- ('[' s {| where_expr |} s ']') / {| id_expr |}
@@ -102,11 +102,13 @@ local grammar_string = [[
 	equation_expr <- {| {:type:''->'equation':} {:left:value:} s '=' s {:right:value:} |}
 	id_expr <- {| {:type:''->'id':} '#' {:value:value:} |}
 	modifiers <- {| {modifier}+ |}
-	modifier <- asc_modifier / desc_modifier / where_modifier / from_modifier
+	modifier <- asc_modifier / desc_modifier / where_modifier / from_modifier / limit_modifer / offset_modifier
 	where_modifier <- {| {:where_clause:where_clause:} |}
 	asc_modifier <-  {| s '<' s {:asc:identifier:} |}
 	desc_modifier <- {| s '>' s {:desc:identifier:} |}
 	from_modifier <- {| s '@' s {:from:identifier:} |}
+	limit_modifer <- {| s '^' s {:limit:integer_literal:} |}
+	offset_modifier <- {| s '+' s {:offset:integer_literal:} |}
 
 	select_all <- ( {< {:table_name:identifier:} >} & %nl) -> select_all
 
@@ -158,6 +160,7 @@ local function modifiers_to_string(modifiers)
 
 	local order_items = {}
 	local where_string, from_string
+	local limit, offset
 	for _, modifier in ipairs(modifiers) do
 		if modifier.asc then
 			table.insert(order_items, ('%s asc'):format(modifier.asc))
@@ -167,6 +170,10 @@ local function modifiers_to_string(modifiers)
 			where_string = where_clause_to_string(modifier.where_clause)
 		elseif modifier.from then
 			from_string = 'from ' .. modifier.from
+		elseif modifier.limit then
+			limit = modifier.limit
+		elseif modifier.offset then
+			offset = modifier.offset
 		end
 	end
 
@@ -181,6 +188,14 @@ local function modifiers_to_string(modifiers)
 
 	if next(order_items) then
 		table.insert(words, 'order by ' .. table.concat(order_items, ', '))
+	end
+
+	if limit then
+		table.insert(words, 'limit ' .. limit)
+	end
+
+	if offset then
+		table.insert(words, 'offset ' .. offset)
 	end
 
 	return table.concat(words, ' ')
@@ -218,7 +233,7 @@ local grammar = re.compile(grammar_string, wrap_defs {
 	end,
 	select = function(statement)
 		return ("select %s %s;"):format(
-			table.concat(statement.fields, ','),
+			statement.fields == '*' and '*' or table.concat(statement.fields, ','),
 			modifiers_to_string(statement.modifiers)
 		)
 	end,

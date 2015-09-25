@@ -35,10 +35,14 @@ end
 
 function test_select()
 	assertEquals(convert('users\n'), 'select * from users;\n')
+	assertEquals(convert('*@users\n'), 'select * from users;\n')
 	assertEquals(convert('name@users#123\n'), 'select name from users where id = 123;\n')
 	assertEquals(convert('name@users\n'), 'select name from users;\n')
 	assertEquals(convert('name@users>id\n'), 'select name from users order by id desc;\n')
 	assertEquals(convert('name@users>id<name\n'), 'select name from users order by id desc, name asc;\n')
+	assertEquals(convert('name@users^10\n'), 'select name from users limit 10;\n')
+	assertEquals(convert('name@users+20\n'), 'select name from users offset 20;\n')
+	assertEquals(convert('name@users+20^10\n'), 'select name from users limit 10 offset 20;\n')
 end
 
 function test_delete()
