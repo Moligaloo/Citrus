@@ -15,6 +15,18 @@ function test_create_table()
 		), 
 		'create table if not exists users(\n\tid integer primary key autoincrement,\n\tname text not null,\n\tgender integer not null,\n\tlocation text\n);\n'
 	)
+
+	assertEquals(
+		convert(
+			'+@users(id: integer!++, name:text, gender:integer, location: text?)\n'
+		), 
+		'create table users(\n\tid integer primary key autoincrement,\n\tname text not null,\n\tgender integer not null,\n\tlocation text\n);\n'
+	)
+end
+
+function test_drop_table()
+	assertEquals(convert('-@users\n'), 'drop table users;\n')
+	assertEquals(convert('-@?users\n'), 'drop table if exists users;\n')
 end
 
 function test_insert()
