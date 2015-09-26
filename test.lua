@@ -28,7 +28,7 @@ function test_drop_table()
 end
 
 function test_insert()
-	ae('+users(name: "Moligaloo", gender: "male")', 'insert into users(name, gender) values("Moligaloo", "male")')
+	ae([[+users(name: "Moligaloo", gender: 'male', age: 22)]], [[insert into users(name, gender, age) values("Moligaloo", 'male', 22)]])
 end
 
 function test_select()
@@ -52,6 +52,7 @@ end
 function test_delete()
 	ae('-users', 'delete from users')
 	ae('-users[location = "Shanghai"]', 'delete from users where location = "Shanghai"')
+	ae('-users#123', 'delete from users where id = 123')
 end
 
 os.exit(luaunit.LuaUnit.run())

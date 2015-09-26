@@ -92,7 +92,7 @@ local grammar_string = [[
 	key_value <- {| {:key:identifier:} s ':' s {:value:value:} |} (s ',' s)?
 	value <- integer_literal / string_literal / identifier
 	integer_literal <- [0-9]+
-	string_literal <- '"' [^"]+ '"'
+	string_literal <- ('"' [^"]+ '"') / ("'" [^']+ "'")
 
 	SQL:select ({:fields:fields:} / {:fields:'*':}) {:modifiers:modifiers?:} 
 	fields <- LIST(field,',')
