@@ -98,8 +98,9 @@ local grammar_string = [[
 	fields <- LIST(field,',')
 	field <- identifier
 	where_clause <- ('[' s {| where_expr |} s ']') / {| id_expr |}
-	where_expr <- equation_expr
-	equation_expr <- {| {:type:''->'equation':} {:left:value:} s '=' s {:right:value:} |}
+	where_expr <- compare_expr
+	compare_expr <- {| {:type:''->'compare_expr':} {:left:value:} s {:op:compare_op:} s {:right:value:} |}
+	compare_op <- '<>' / ('!=' -> '<>') / '>=' / '<=' / '<' / '>' / '=' 
 	id_expr <- {| {:type:''->'id':} '#' {:value:value:} |}
 	modifiers <- {| {modifier}+ |}
 	modifier <- asc_modifier / desc_modifier / where_modifier / from_modifier / limit_modifer / offset_modifier
@@ -144,8 +145,8 @@ local function where_clause_to_string(where_clause, options)
 	end
 	local words = { options.prepend_space and ' where' or 'where'}
 	for _, expression in ipairs(where_clause) do
-		if expression.type == 'equation' then
-			table.insert(words, ("%s = %s"):format(expression.left, expression.right))
+		if expression.type == 'compare_expr' then
+			table.insert(words, expand('$left $op $right', expression))
 		elseif expression.type == 'id' then
 			table.insert(words, 'id = ' .. expression.value)
 		end

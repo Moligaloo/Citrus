@@ -42,6 +42,12 @@ function test_select()
 	ae('name@users+20', 'select name from users offset 20')
 	ae('name@users+20^10', 'select name from users limit 10 offset 20')
 	ae('id,name@users', 'select id, name from users')
+	ae('name@users[age>18]', 'select name from users where age > 18')
+	ae('name@users[age<18]', 'select name from users where age < 18')
+	ae('name@users[age<>18]', 'select name from users where age <> 18')
+	ae('name@users[age!=18]', 'select name from users where age <> 18')
+	ae('name@users[age>=18]', 'select name from users where age >= 18')
+	ae('name@users[age<=18]', 'select name from users where age <= 18')
 end
 
 function test_update()
