@@ -123,18 +123,10 @@ local grammar_string = ([[
 	update_pair <- {| {:field_name:identifier:} s '=' s {:value:value:}  (s ',' s)? |}
 ]]):gsub(
 	'SQL:([%w_]+)%s+([^\n]+)', 
-	'%1 <- ( {| {:start:{}:} %2 {:finish:{}:} |} &%%nl ) -> %1'
+	'%1 <- ({| %2 |} &%%nl ) -> %1'
 )
 	
-local function wrap_defs(defs)
-	for name, func in pairs(defs) do
-		defs[name] = function(statement)
-			statement.value = func(statement)
-			return statement
-		end
-	end
-	return defs
-end
+local json = require 'dkjson'
 
 local function where_clause_to_string(where_clause, options)
 	options = options or { prepend_space = false }
@@ -234,7 +226,7 @@ local function update_pairs_to_string(update_pairs)
 	return table.concat(words, ', ')
 end
 
-local grammar = re.compile(grammar_string, wrap_defs {
+local grammar = re.compile(grammar_string, {
 	create_table = function(statement)
 		return
 			("create table %s%s(\n\t%s\n);"):format(
@@ -290,25 +282,10 @@ local grammar = re.compile(grammar_string, wrap_defs {
 	end
 })
 
-local function to_sqlite(content, options)
-	options = options or { keep_citrus_as_comment = true}
-
+local function to_sqlite(content)
 	local statements = grammar:match(content)
 	if statements then
-		local strings = {}
-		for _, statement in ipairs(statements) do
-			if type(statement) == 'string' then
-				table.insert(strings, statement)
-			else
-				if options.keep_citrus_as_comment then
-					local start, finish = statement.start, statement.finish
-					table.insert(strings, '-- ' .. content:sub(start, finish))
-				end
-				table.insert(strings, statement.value)
-			end
-		end
-
-		return table.concat(strings)
+		return table.concat(statements)
 	end
 end
 

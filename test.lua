@@ -6,7 +6,7 @@ local assertEquals = luaunit.assertEquals
 local citrus = require 'citrus'
 local ae = function(citrus_code_without_newline, sql_code_without_semicolon_and_newline)
 	local citrus_code = citrus_code_without_newline .. '\n'
-	local result_code = citrus.to_sqlite(citrus_code, {keep_citrus_as_comment = false})
+	local result_code = citrus.to_sqlite(citrus_code)
 	local right
 	if sql_code_without_semicolon_and_newline == nil then
 		right = nil
