@@ -96,9 +96,8 @@ local grammar_string = [[
 	string_literal <- ('"' [^"]+ '"') / ("'" [^']+ "'")
 	null_value <- {| {:type:('null' / 'NULL')->'null':} |}
  
-	SQL:select ({:fields:fields:} / {:fields:'*':}) &'@' {:modifiers:modifiers?:} 
-	fields <- LIST(field,',')
-	field <- identifier
+	SQL:select ({:csv:csv:} / {:csv:'*':}) &'@' {:modifiers:modifiers?:} 
+	csv <- {| ({value} (s ',' s)?)+ |}
 	where_clause <- ('[' s {| expr |} s ']') / {| id_expr |}
 	expr <- compare_expr
 	compare_expr <- {| {:type:''->'compare_expr':} {:left:value:} s {:compare_op:compare_op:} s {:right:value:} |}
@@ -124,11 +123,10 @@ local grammar_string = [[
 	update_pair <- {| {:field_name:identifier:} s '=' s {:value:value:}  (s ',' s)? |}
 ]]
 
-grammar_string = grammar_string:
-	gsub('SQL:([%w_]+)%s+([^\n]+)', '%1 <- ( {| {:start:{}:} %2 {:finish:{}:} |} &%%nl ) -> %1'):
-	gsub('LIST%(([%w]+)%s*,%s*([^%)]+)%)', function(elem, sep)
-		return ('{| {%s} (s %s s {%s})* |}'):format(elem, sep, elem)
-	end)
+grammar_string = grammar_string:gsub(
+	'SQL:([%w_]+)%s+([^\n]+)', 
+	'%1 <- ( {| {:start:{}:} %2 {:finish:{}:} |} &%%nl ) -> %1'
+)
 	
 local function wrap_defs(defs)
 	for name, func in pairs(defs) do
@@ -226,6 +224,10 @@ local function modifiers_to_string(modifiers)
 	return table.concat(words, ' ')
 end
 
+local function csv_to_string(csv)
+	return csv == '*' and '*' or table.concat(csv, ', ')
+end
+
 local function update_pairs_to_string(update_pairs)
 	local words = {}
 	for _, pair in pairs(update_pairs) do
@@ -258,7 +260,7 @@ local grammar = re.compile(grammar_string, wrap_defs {
 	end,
 	select = function(statement)
 		return ("select %s %s;"):format(
-			statement.fields == '*' and '*' or table.concat(statement.fields, ', '),
+			csv_to_string(statement.csv),
 			modifiers_to_string(statement.modifiers)
 		)
 	end,

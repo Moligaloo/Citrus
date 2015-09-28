@@ -58,7 +58,6 @@ function test_select()
 	ae('name@users[location != NULL]', 'select name from users where location notnull')
 	ae('name@users[location == null]', 'select name from users where location isnull')
 	ae('name@users[location = null]', 'select name from users where location isnull')
-	ae('name>id@users', nil)
 end
 
 function test_update()
