@@ -71,7 +71,7 @@ local function expand(format, vars)
 	return string
 end
 
-local grammar_string = [[
+local grammar_string = ([[
 	statements <- {| statement+ |}
 	
 	statement <- comment / empty / create_table / insert / select_all / select / drop_table / delete / update
@@ -121,9 +121,7 @@ local grammar_string = [[
 	SQL:update {:update_pairs:update_pairs:} s '@' s {:table_name:identifier:} {:where_clause:where_clause?:} 
 	update_pairs <- {| update_pair+ |}
 	update_pair <- {| {:field_name:identifier:} s '=' s {:value:value:}  (s ',' s)? |}
-]]
-
-grammar_string = grammar_string:gsub(
+]]):gsub(
 	'SQL:([%w_]+)%s+([^\n]+)', 
 	'%1 <- ( {| {:start:{}:} %2 {:finish:{}:} |} &%%nl ) -> %1'
 )
