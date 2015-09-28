@@ -7,7 +7,13 @@ local citrus = require 'citrus'
 local ae = function(citrus_code_without_newline, sql_code_without_semicolon_and_newline)
 	local citrus_code = citrus_code_without_newline .. '\n'
 	local result_code = citrus.to_sqlite(citrus_code, {keep_citrus_as_comment = false})
-	assertEquals(result_code, sql_code_without_semicolon_and_newline .. ';\n')
+	local right
+	if sql_code_without_semicolon_and_newline == nil then
+		right = nil
+	else
+		right = sql_code_without_semicolon_and_newline .. ';\n'
+	end
+	assertEquals(result_code, right)
 end
 
 function test_create_table()
@@ -52,6 +58,7 @@ function test_select()
 	ae('name@users[location != NULL]', 'select name from users where location notnull')
 	ae('name@users[location == null]', 'select name from users where location isnull')
 	ae('name@users[location = null]', 'select name from users where location isnull')
+	ae('name>id@users', nil)
 end
 
 function test_update()

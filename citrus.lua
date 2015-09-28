@@ -96,7 +96,7 @@ local grammar_string = [[
 	string_literal <- ('"' [^"]+ '"') / ("'" [^']+ "'")
 	null_value <- {| {:type:('null' / 'NULL')->'null':} |}
  
-	SQL:select ({:fields:fields:} / {:fields:'*':}) {:modifiers:modifiers?:} 
+	SQL:select ({:fields:fields:} / {:fields:'*':}) &'@' {:modifiers:modifiers?:} 
 	fields <- LIST(field,',')
 	field <- identifier
 	where_clause <- ('[' s {| expr |} s ']') / {| id_expr |}
