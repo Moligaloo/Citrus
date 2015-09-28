@@ -79,28 +79,30 @@ local grammar_string = [[
 	comment <- { '--' [^%nl]+ %nl }
 
 	SQL:create_table '+@' {:optional:'?'?:} s {:table_name:identifier:}  {:columns:column_defs:}
-	identifier <- [_a-zA-Z][_a-zA-Z0-9]+
+	identifier <- !(reserved_words) [_a-zA-Z][_a-zA-Z0-9]+
 	column_defs <- '(' s {| column_def+ |} s ')'
 	column_def <- {| {:column_name:identifier:} s ':' s {:column_type:column_type:} |} / (',' s column_def)
 	column_type <- {| {:base_name:identifier:} {:postfixes:column_type_postfixes:} |}
 	column_type_postfix <- '!' / '?' / '++'
 	column_type_postfixes <- {| {column_type_postfix}* |} 
+	reserved_words <- null_value
 	s <- [%s]*
 	
 	SQL:insert '+' {:table_name:identifier:} {:key_values:key_values:} 
 	key_values <- '(' s {| key_value+ |} s ')'
 	key_value <- {| {:key:identifier:} s ':' s {:value:value:} |} (s ',' s)?
-	value <- integer_literal / string_literal / identifier
+	value <- integer_literal / string_literal / identifier / null_value
 	integer_literal <- [0-9]+
 	string_literal <- ('"' [^"]+ '"') / ("'" [^']+ "'")
-
+	null_value <- {| {:type:('null' / 'NULL')->'null':} |}
+ 
 	SQL:select ({:fields:fields:} / {:fields:'*':}) {:modifiers:modifiers?:} 
 	fields <- LIST(field,',')
 	field <- identifier
-	where_clause <- ('[' s {| where_expr |} s ']') / {| id_expr |}
-	where_expr <- compare_expr
-	compare_expr <- {| {:type:''->'compare_expr':} {:left:value:} s {:op:compare_op:} s {:right:value:} |}
-	compare_op <- '<>' / ('!=' -> '<>') / '>=' / '<=' / '<' / '>' / '=' 
+	where_clause <- ('[' s {| expr |} s ']') / {| id_expr |}
+	expr <- compare_expr
+	compare_expr <- {| {:type:''->'compare_expr':} {:left:value:} s {:compare_op:compare_op:} s {:right:value:} |}
+	compare_op <- '<>' / ('!=' -> '<>') / '>=' / '<=' / '<' / '>' / ('==' -> '=' / '=') 
 	id_expr <- {| {:type:''->'id':} '#' {:value:value:} |}
 	modifiers <- {| {modifier}+ |}
 	modifier <- asc_modifier / desc_modifier / where_modifier / from_modifier / limit_modifer / offset_modifier
@@ -146,7 +148,23 @@ local function where_clause_to_string(where_clause, options)
 	local words = { options.prepend_space and ' where' or 'where'}
 	for _, expression in ipairs(where_clause) do
 		if expression.type == 'compare_expr' then
-			table.insert(words, expand('$left $op $right', expression))
+			-- special case
+			local special_case = false
+
+			if  expression.right.type == 'null' then
+				local compare_op = expression.compare_op
+				if compare_op == '<>' then
+					table.insert(words, expression.left .. ' notnull')
+					special_case = true
+				elseif compare_op == '=' then
+					table.insert(words, expression.left .. ' isnull')
+					special_case = true
+				end
+			end
+
+			if not special_case then
+				table.insert(words, expand('$left $compare_op $right', expression))
+			end
 		elseif expression.type == 'id' then
 			table.insert(words, 'id = ' .. expression.value)
 		end

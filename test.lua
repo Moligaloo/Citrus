@@ -48,6 +48,10 @@ function test_select()
 	ae('name@users[age!=18]', 'select name from users where age <> 18')
 	ae('name@users[age>=18]', 'select name from users where age >= 18')
 	ae('name@users[age<=18]', 'select name from users where age <= 18')
+	ae('name@users[location != null]', 'select name from users where location notnull')
+	ae('name@users[location != NULL]', 'select name from users where location notnull')
+	ae('name@users[location == null]', 'select name from users where location isnull')
+	ae('name@users[location = null]', 'select name from users where location isnull')
 end
 
 function test_update()
